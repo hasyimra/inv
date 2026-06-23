@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\GlJournal;
+use App\Models\GlSetting;
 use App\Models\InvAdjustment;
 use App\Models\InvStockBalance;
 use App\Models\InvStockMovement;
@@ -84,7 +86,9 @@ class InvAdjustmentController extends Controller
         abort_if($adjustment->status !== 'diajukan', 403);
 
         DB::transaction(function () use ($adjustment) {
-            $adjustment->load('lines');
+            $adjustment->load('lines.item');
+
+            $costs = [];
 
             foreach ($adjustment->lines as $line) {
                 if ((float) $line->qty_adjusted === 0.0) {
@@ -105,8 +109,11 @@ class InvAdjustmentController extends Controller
                     ['item_id' => $line->item_id, 'warehouse_id' => $adjustment->warehouse_id],
                     ['qty_on_hand' => 0, 'unit_cost' => 0]
                 );
+                $costs[$line->id] = (float) $balance->unit_cost;
                 $balance->increment('qty_on_hand', $line->qty_adjusted);
             }
+
+            $this->postAdjustmentJournal($adjustment, $costs);
 
             // Adjustment langsung dieksekusi saat approve (tidak ada langkah lanjutan setelahnya, beda dari modul lain).
             $adjustment->update([
@@ -117,6 +124,63 @@ class InvAdjustmentController extends Controller
         });
 
         return back()->with('success', 'Adjustment disetujui dan stok telah diperbarui.');
+    }
+
+    /**
+     * Dr Persediaan / Cr Selisih Persediaan untuk kenaikan stok (qty_adjusted positif),
+     * dibalik untuk penurunan. Amount = abs(qty_adjusted) x unit_cost SAAT approval — diambil
+     * dari $costs (di-capture sebelum increment di loop atas; unit_cost weighted-average
+     * sendiri tidak diubah oleh adjustment, hanya qty_on_hand, jadi nilainya sama saja, tapi
+     * tetap diambil sebelum demi konsistensi kalau logic itu berubah nanti).
+     */
+    private function postAdjustmentJournal(InvAdjustment $adjustment, array $costs): void
+    {
+        $varianceAccountId = GlSetting::where('key', 'inventory_adjustment')->first()?->gl_account_id;
+
+        $lines = [];
+
+        foreach ($adjustment->lines as $line) {
+            $qty = (float) $line->qty_adjusted;
+            $unitCost = $costs[$line->id] ?? null;
+            if ($qty === 0.0 || $unitCost === null) {
+                continue;
+            }
+
+            $amount = round(abs($qty) * $unitCost, 2);
+            if ($amount <= 0) {
+                continue;
+            }
+
+            $inventoryAccountId = $line->item->inventory_gl_account_id;
+            if (! $inventoryAccountId) {
+                throw new \RuntimeException("Item {$line->item->description} belum punya GL Account Persediaan, lengkapi dulu di master item.");
+            }
+            if (! $varianceAccountId) {
+                throw new \RuntimeException('GL Account untuk Selisih Persediaan belum diatur di GL Settings.');
+            }
+
+            $description = 'Adjustment - '.($line->item->description ?? '');
+
+            if ($qty > 0) {
+                $lines[] = ['gl_account_id' => $inventoryAccountId, 'debit' => $amount, 'credit' => 0, 'description' => $description];
+                $lines[] = ['gl_account_id' => $varianceAccountId, 'debit' => 0, 'credit' => $amount, 'description' => $description];
+            } else {
+                $lines[] = ['gl_account_id' => $varianceAccountId, 'debit' => $amount, 'credit' => 0, 'description' => $description];
+                $lines[] = ['gl_account_id' => $inventoryAccountId, 'debit' => 0, 'credit' => $amount, 'description' => $description];
+            }
+        }
+
+        if (empty($lines)) {
+            return;
+        }
+
+        GlJournal::postBalanced([
+            'journal_date' => $adjustment->adjustment_date,
+            'description' => 'Inventory Adjustment '.$adjustment->adjustment_no,
+            'source_type' => 'inv_adjustment',
+            'source_id' => $adjustment->id,
+            'created_by' => Auth::id(),
+        ], $lines);
     }
 
     public function reject(InvAdjustment $adjustment): RedirectResponse
