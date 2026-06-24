@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\SsoCallbackController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvAdjustmentController;
 use App\Http\Controllers\PhysicalCountController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\StockBalanceController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -23,6 +24,10 @@ Route::middleware('auth')->group(function () {
     // --- Users (sso_admin only, enforced in controller via middleware below) ---
     Route::get('users', [UserController::class, 'index'])->name('users.index');
     Route::put('users/{user}', [UserController::class, 'update'])->name('users.update')->middleware('role:sso_admin,admin');
+
+    // --- Reports ---
+    Route::get('reports/stock-movement-history', [ReportController::class, 'stockMovementHistory'])->name('reports.stock-movement-history');
+    Route::get('reports/adjustment-count-history', [ReportController::class, 'adjustmentCountHistory'])->name('reports.adjustment-count-history');
 
     // --- Stock Balances (read-only) ---
     Route::get('stock-balances', [StockBalanceController::class, 'index'])->name('stock-balances.index');
@@ -42,6 +47,7 @@ Route::middleware('auth')->group(function () {
     Route::get('physical-counts', [PhysicalCountController::class, 'index'])->name('physical-counts.index');
     Route::get('physical-counts/create', [PhysicalCountController::class, 'create'])->name('physical-counts.create')->middleware('role:admin,user');
     Route::post('physical-counts', [PhysicalCountController::class, 'store'])->name('physical-counts.store')->middleware('role:admin,user');
+    Route::get('physical-counts/{physicalCount}/count-sheet', [PhysicalCountController::class, 'countSheet'])->name('physical-counts.count-sheet');
     Route::get('physical-counts/{physicalCount}', [PhysicalCountController::class, 'show'])->name('physical-counts.show');
     Route::get('physical-counts/{physicalCount}/edit', [PhysicalCountController::class, 'edit'])->name('physical-counts.edit')->middleware('role:admin,user');
     Route::put('physical-counts/{physicalCount}', [PhysicalCountController::class, 'update'])->name('physical-counts.update')->middleware('role:admin,user');

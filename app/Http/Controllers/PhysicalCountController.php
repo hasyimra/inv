@@ -113,6 +113,14 @@ class PhysicalCountController extends Controller
         return view('physical-counts.show', compact('physicalCount'));
     }
 
+    public function countSheet(InvPhysicalCount $physicalCount): View
+    {
+        $physicalCount->load('warehouse', 'lines.item');
+        $physicalCount->lines = $physicalCount->lines->sortBy(fn ($line) => $line->item->description);
+
+        return view('physical-counts.count-sheet', compact('physicalCount'));
+    }
+
     public function destroy(InvPhysicalCount $physicalCount): RedirectResponse
     {
         abort_if($physicalCount->status !== 'draft', 403, 'Hanya physical count draft yang bisa dihapus.');

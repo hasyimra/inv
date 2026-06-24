@@ -83,6 +83,16 @@
                     <i data-feather="clipboard"></i><span>Physical Counts</span>
                 </a>
             </li>
+            <li class="sidebar-list">
+                <a class="sidebar-link {{ request()->routeIs('reports.stock-movement-history') ? 'active' : '' }}" href="{{ route('reports.stock-movement-history') }}">
+                    <i data-feather="clock"></i><span>Stock Movement History</span>
+                </a>
+            </li>
+            <li class="sidebar-list">
+                <a class="sidebar-link {{ request()->routeIs('reports.adjustment-count-history') ? 'active' : '' }}" href="{{ route('reports.adjustment-count-history') }}">
+                    <i data-feather="file-text"></i><span>Adjustment/Count History</span>
+                </a>
+            </li>
         @endunless
         @if(auth()->user()->canManageUsers())
             <li class="sidebar-list">

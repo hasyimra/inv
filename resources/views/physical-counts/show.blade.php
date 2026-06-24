@@ -8,9 +8,12 @@
         <div class="col-md-8">
             <div class="card">
                 <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <h5>{{ $physicalCount->count_no }}</h5>
-                        <span class="badge bg-{{ $physicalCount->status_color }}">{{ $physicalCount->status_label }}</span>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">{{ $physicalCount->count_no }}</h5>
+                        <div>
+                            <a href="{{ route('physical-counts.count-sheet', $physicalCount) }}" target="_blank" class="btn btn-sm btn-outline-secondary">Cetak Count Sheet</a>
+                            <span class="badge bg-{{ $physicalCount->status_color }}">{{ $physicalCount->status_label }}</span>
+                        </div>
                     </div>
                     <table class="table table-borderless mb-0">
                         <tr><td class="text-muted" style="width:160px">Gudang</td><td>{{ $physicalCount->warehouse->name }}</td></tr>
